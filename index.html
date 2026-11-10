@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genshin Impact Mini-Clicker & Gacha</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #111424, #1c2038);
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+        .game-container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 450px;
+            width: 90%;
+        }
+        h1 {
+            color: #f3ca52;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .currency {
+            font-size: 20px;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #ece5d8;
+        }
+        .primogems-count {
+            color: #4ae3ff;
+        }
+        .click-btn {
+            background: radial-gradient(circle, #45527a, #2a3454);
+            border: 2px solid #f3ca52;
+            color: #fff;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        .click-btn:active {
+            transform: scale(0.96);
+        }
+        .gacha-panel {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 20px;
+        }
+        .gacha-btn {
+            background: linear-gradient(90deg, #f3ca52, #bd962c);
+            border: none;
+            color: #111424;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: opacity 0.2s;
+        }
+        .gacha-btn:hover {
+            opacity: 0.9;
+        }
+        .gacha-btn:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+        .result-display {
+            margin-top: 20px;
+            min-height: 60px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .star5 { color: #f3ca52; text-shadow: 0 0 10px rgba(243,202,82,0.6); }
+        .star4 { color: #a252f3; text-shadow: 0 0 10px rgba(162,82,243,0.6); }
+        .star3 { color: #529af3; }
+        
+        .inventory {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+            text-align: left;
+            max-height: 120px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>Genshin Gacha Clicker</h1>
+    
+    <div class="currency">
+        💎 Камни Истока: <span id="primos" class="primogems-count">0</span>
+    </div>
+
+    <button class="click-btn" onclick="addPrimos()">Фармить примогемы (+160)</button>
+
+    <div class="gacha-panel">
+        <button class="gacha-btn" id="pull1" onclick="pull(1)">1 крутка (160 💎)</button>
+        <button class="gacha-btn" id="pull10" onclick="pull(10)">10 круток (1600 💎)</button>
+    </div>
+
+    <div class="result-display" id="result">У вас пока нет наград. Время крутить баннер!</div>
+    
+    <div style="margin-top: 15px; font-size: 13px; color: #778;">До 5★ гаранта осталось: <span id="pity">90</span></div>
+
+    <div class="inventory" id="inventory">
+        <strong>Ваша коллекция:</strong>
+        <div id="inv-list">Пусто</div>
+    </div>
+</div>
+
+<script>
+    let primos = 0;
+    let pity5 = 0;
+    let pity4 = 0;
+    let collection = {};
+
+    const pool5 = ["Нахида 🌟🌟🌟🌟🌟", "Ху Тао 🌟🌟🌟🌟🌟", "Чжун Ли 🌟🌟🌟🌟🌟", "Райдэн 🌟🌟🌟🌟🌟", "Дилюк 🌟🌟🌟🌟🌟"];
+    const pool4 = ["Беннет ✨✨✨✨", "Син Цю ✨✨✨✨", "Фишль ✨✨✨✨", "Сян Лин ✨✨✨✨", "Меч Фавония ✨✨✨✨"];
+    const pool3 = ["3★ Оружие (Мусор) ⚔️"];
+
+    function updateUI() {
+        document.getElementById('primos').innerText = primos;
+        document.getElementById('pity').innerText = (90 - pity5);
+        
+        document.getElementById('pull1').disabled = primos < 160;
+        document.getElementById('pull10').disabled = primos < 1600;
+
+        let invHTML = "";
+        for (let item in collection) {
+            invHTML += `<div>${item} x${collection[item]}</div>`;
+        }
+        document.getElementById('inv-list').innerHTML = invHTML || "Пусто";
+    }
+
+    function addPrimos() {
+        primos += 160; // Даем сразу на одну крутку для быстрого геймплея
+        updateUI();
+    }
+
+    function dropItem() {
+        pity5++;
+        pity4++;
+
+        // Шансы и гаранты
+        if (pity5 >= 90 || Math.random() < 0.006) {
+            pity5 = 0;
+            const char = pool5[Math.floor(Math.random() * pool5.length)];
+            addToCollection(char);
+            return { name: char, rarity: 'star5' };
+        }
+        
+        if (pity4 >= 10 || Math.random() < 0.051) {
+            pity4 = 0;
+            const char = pool4[Math.floor(Math.random() * pool4.length)];
+            addToCollection(char);
+            return { name: char, rarity: 'star4' };
+        }
+
+        return { name: pool3[0], rarity: 'star3' };
+    }
+
+    function addToCollection(item) {
+        collection[item] = (collection[item] || 0) + 1;
+    }
+
+    function pull(count) {
+        let cost = count * 160;
+        if (primos < cost) return;
+        
+        primos -= cost;
+        let results = [];
+        let highestRarity = 'star3';
+
+        for (let i = 0; i < count; i++) {
+            let res = dropItem();
+            results.push(res.name);
+            if (res.rarity === 'star5') highestRarity = 'star5';
+            else if (res.rarity === 'star4' && highestRarity !== 'star5') highestRarity = 'star4';
+        }
+
+        const resDisplay = document.getElementById('result');
+        resDisplay.className = `result-display ${highestRarity}`;
+        
+        if (count === 1) {
+            resDisplay.innerText = `Выпало: ${results[0]}`;
+        } else {
+            resDisplay.innerText = `Выпало: ${results.filter(x => !x.includes('3★')).join(', ') || 'Один мусор 3★'}`;
+        }
+
+        updateUI();
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
